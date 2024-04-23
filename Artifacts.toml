@@ -1,0 +1,6 @@
+[PackageBundlerExampleRegistry]
+git-tree-sha1 = "36962bd1405e0d3ddcad5ffb7be414410d4ec1aa"
+
+    [[PackageBundlerExampleRegistry.download]]
+    sha256 = "5dc249b1d981127c322e0d5d86e5e11a7c5314e5f94e9c5a541103853eaffcd1"
+    url = "https://github.com/MichaelHatherly/package-bundler-builder-example/releases/download/1.0.0/PackageBundlerExampleRegistry.tar.gz"
