@@ -72,6 +72,89 @@ function remove()
 end
 
 """
+    copy(environment::String, path::String)
+
+Copy a bundled package environment to a new location. The environment is
+resolved and precompiled in the new location. The `path` should not exist before
+calling this function. The `environment` should be the name of one of the
+bundled environments.
+
+This function is useful when you want to duplicate an environment to a new
+location locally so that you can add additional packages to it, since bundled
+environments should be considered read-only.
+"""
+function copy(environment::String, path::String)
+    environments_dir = joinpath(artifact"PackageBundlerExampleRegistry", "environments")
+    environments = readdir(environments_dir)
+    if environment in environments
+        path = abspath(path)
+        if ispath(path)
+            error("`$path` already exists. Please remove it first if you want to duplicate an environment to that location.")
+        else
+            mkpath(path)
+
+            # Copy from a read-only artifact environment to the new location, so
+            # we need to copy the files manually.
+            artifact_env = joinpath(environments_dir, environment)
+            for (root, _, files) in walkdir(artifact_env)
+                for file in files
+                    # Skip the signing files since we expect them to be invalid
+                    # as soon as a user adds additional packages.
+                    endswith(file, r"\.(pub|sign)$") && continue
+
+                    src = joinpath(root, file)
+                    dst = joinpath(path, relpath(src, artifact_env))
+                    mkpath(dirname(dst))
+                    write(dst, read(src))
+                end
+            end
+
+            # Add some metadata to the project file so that we can track the
+            # environment that was copied.
+            project = joinpath(path, "Project.toml")
+            if !isfile(project)
+                error("Could not find the project file for the environment `$path`.")
+            end
+            toml = TOML.parsefile(project)
+            toml["package_bundler"] = Dict("environment" => environment)
+            open(project, "w") do file_io
+                TOML.print(file_io, toml, sorted=true, by=key -> (Pkg.Types.project_key_order(key), key))
+            end
+
+            manifest = joinpath(path, "Manifest.toml")
+            if !isfile(manifest)
+                error("Could not find the manifest file for the environment `$path`.")
+            end
+            toml = TOML.parsefile(manifest)
+
+            julia_version = toml["julia_version"]
+            channel = "+$julia_version"
+
+            multiplexer = juliaup()
+
+            try
+                run(`$multiplexer add $julia_version`)
+            catch error
+                @error "failed to install required `julia` version using `juliaup`." version = julia_version
+                rethrow(error)
+            end
+
+            @info "Resolving and precompiling environment." environment = path
+
+            try
+                run(`julia $channel --startup-file=no --project=$path -e 'import Pkg; Pkg.resolve(); Pkg.precompile()'`)
+            catch error
+                @error "failed to resolve and precompile environment." environment = path
+                rethrow(error)
+            end
+        end
+    else
+        environments_fmt = join(("`$each`" for each in environments), ", ", ", and ")
+        error("The environment `$environment` does not exist. Available environments are: $environments_fmt")
+    end
+end
+
+"""
     juliaup()
 
 Returns the `juliaup` command for use in `run` calls. Throws an error when it is
