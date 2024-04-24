@@ -74,3 +74,14 @@ julia --project=@bundled@v1.1.0
 > ```
 > julia +1.10.1 --project=@bundled@v1.0.0
 > ```
+
+## Removal
+
+To remove the bundled packages and their environments run the following:
+
+```
+julia --startup-file=no --project=@PackageBundlerProviderExample -e '
+  import PackageBundlerProviderExample;
+  PackageBundlerProviderExample.remove()
+'
+```
