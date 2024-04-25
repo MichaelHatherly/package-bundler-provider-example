@@ -101,6 +101,10 @@ julia> ] add Some Extra Packages
 Note that the included compat bounds in the `Project.toml` of the copied
 environment may restrict what versions of extra packages you are be able to add.
 
+A `juliaup override` is applied to the copied environment's directory to ensure
+that the correct `julia` version is used when activating the environment
+regardless of what the user's default `julia` version is.
+
 ## Removal
 
 To remove the bundled packages and their environments run the following:
