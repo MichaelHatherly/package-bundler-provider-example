@@ -87,6 +87,13 @@ function copy(environment::String, path::String)
     environments_dir = joinpath(artifact"PackageBundlerExampleRegistry", "environments")
     environments = readdir(environments_dir)
     if environment in environments
+        multiplexer = juliaup()
+
+        # Ensure there aren't stale overrides that could interfere with the
+        # copying of the environment since it might have changed `julia`
+        # version.
+        run(`$multiplexer override unset --nonexistent`)
+
         path = abspath(path)
         if ispath(path)
             error("`$path` already exists. Please remove it first if you want to duplicate an environment to that location.")
@@ -128,9 +135,6 @@ function copy(environment::String, path::String)
             toml = TOML.parsefile(manifest)
 
             julia_version = toml["julia_version"]
-            channel = "+$julia_version"
-
-            multiplexer = juliaup()
 
             try
                 run(`$multiplexer add $julia_version`)
@@ -141,11 +145,15 @@ function copy(environment::String, path::String)
 
             @info "Resolving and precompiling environment." environment = path
 
-            try
-                run(`julia $channel --startup-file=no --project=$path -e 'import Pkg; Pkg.resolve(); Pkg.precompile()'`)
-            catch error
-                @error "failed to resolve and precompile environment." environment = path
-                rethrow(error)
+            cd(path) do
+                # Set the channel for this directory to override the default.
+                run(`$multiplexer override set $julia_version`)
+                try
+                    run(`julia --startup-file=no --project=$path -e 'import Pkg; Pkg.resolve(); Pkg.precompile()'`)
+                catch error
+                    @error "failed to resolve and precompile environment." environment = path
+                    rethrow(error)
+                end
             end
         end
     else
